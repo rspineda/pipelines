@@ -1,0 +1,3 @@
+variables:
+  azServiceConnection: "AZU-EUR-WW-DEV-RSDevOps"
+  azKeyVault: "KV-EUR-WW-DEV-EXTERNALSERVICE" #External Service Key Vault
