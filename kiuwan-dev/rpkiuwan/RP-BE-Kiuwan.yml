@@ -1,0 +1,71 @@
+schedules:
+  # Runs each night at 21:30 UTC. Even run if there are no changes.
+  - cron: "30 21 * * *"
+    displayName: "Run Kiuwan report for Ronald Pineda BE"
+    branches:
+      include:
+        - develop
+    always: true
+
+resources:
+  repositories:
+    - repository: pipeline-templates #CBE central pipeline templates from external repo
+      type: git
+      name: Templates/pipelines
+      ref: refs/heads/main
+      endpoint: GlobalInfrastructure #Needs a service connection enabled
+
+    - repository: ronaldpineda-backend #BE repo
+      type: git
+      name: "projectName/ronaldpineda-backend"
+      ref: develop
+      trigger:
+      - none
+
+    - repository: ronaldpineda-devops # evops repo
+      type: git
+      name: "projectName/ronaldpineda-devops"
+      ref: master
+      trigger:
+      - none
+
+workspace:
+  clean: all
+
+pool:
+  vmImage: ubuntu-20.04
+
+variables:
+- template: variables/dev.yaml
+
+steps:
+  # checkout repos
+  - checkout: pipeline-templates
+  - checkout: ronaldpineda-backend 
+  - checkout: ronaldpineda-devops
+
+  - task: AzureKeyVault@2
+    displayName: "Download Azure Key Vault secrets"
+    inputs:
+      azureSubscription: "$(azServiceConnection)" #SPN must be allowed on KeyVault
+      KeyVaultName: "$(azKeyVault)" #SPN must have secret permissions
+      secretsFilter: 'kiuwanUser,kiuwanSecret,kiuwanDomainId'
+  
+  #DEBUGGING
+  # - task: Bash@3
+  #   displayName: "Echo Secrets"
+  #   inputs:
+  #     targetType: "inline"
+  #     script: |
+  #       echo $(kiuwanUser)
+  #       echo $(kiuwanSecret)
+  #       echo $(kiuwanDomainId)
+
+  - template: templates/test/kiuwan-analyzer-steps.yaml@pipeline-templates #call analysis template from an external script
+    parameters:
+      username: $(kiuwanUser)
+      password: $(kiuwanSecret)
+      domainId: $(kiuwanDomainId) 
+      appName: RonaldPineda-BE #Name used in Kiuwan Portal
+      sourceDir: '$(Build.SourcesDirectory)/ronaldpineda-backend' #Scan BE repo, Root, must have a package.json or something like that
+      label: RPBE-Pipeline
